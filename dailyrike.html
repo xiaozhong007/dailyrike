@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DailyRike 日課 - 沉浸式英语输出训练</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Serif+SC:wght@400;500;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <script>
+        function initTailwindConfig() {
+            if (typeof tailwind === 'undefined') {
+                setTimeout(initTailwindConfig, 50);
+                return;
+            }
+
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            sans: ['Inter', "PingFang SC", "Microsoft YaHei", 'sans-serif'],
+                            serif: ['"Noto Serif SC"', '"Playfair Display"', 'serif'],
+                        },
+                        colors: {
+                            brand: {
+                                bg: '#f8fafc',
+                                bgSecondary: '#f1f5f9',
+                                card: '#ffffff',
+                                text: '#0f172a',
+                                textSecondary: '#475569',
+                                textMuted: '#94a3b8',
+                                border: '#e2e8f0',
+                                borderLight: '#f1f5f9',
+                            },
+                        },
+                        animation: {
+                            'fade-in': 'fadeIn 0.5s ease-out forwards',
+                            'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                            'expand': 'expand 0.3s ease-out forwards',
+                            'scale-in': 'scaleIn 0.2s ease-out forwards',
+                        },
+                        keyframes: {
+                            fadeIn: {
+                                '0%': { opacity: '0' },
+                                '100%': { opacity: '1' },
+                            },
+                            slideUp: {
+                                '0%': { transform: 'translateY(16px)', opacity: '0' },
+                                '100%': { transform: 'translateY(0)', opacity: '1' },
+                            },
+                            expand: {
+                                '0%': { maxHeight: '0', opacity: '0' },
+                                '100%': { maxHeight: '500px', opacity: '1' },
+                            },
+                            scaleIn: {
+                                '0%': { transform: 'scale(0.95)', opacity: '0' },
+                                '100%': { transform: 'scale(1)', opacity: '1' },
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        initTailwindConfig();
+        window.addEventListener('DOMContentLoaded', initTailwindConfig);
+    </script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+        }
+        .input-clean:focus {
+            outline: none;
+            box-shadow: none;
+        }
+        .input-clean::placeholder {
+            color: #94a3b8;
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .diff-highlight {
+            background: linear-gradient(to bottom, transparent 60%, rgba(34, 197, 94, 0.2) 60%);
+        }
+        .diff-missing {
+            background: linear-gradient(to bottom, transparent 60%, rgba(239, 68, 68, 0.15) 60%);
+        }
+        
+        /* 移动端安全区域 */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .safe-bottom {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+        }
+        
+        /* Modal Backdrop */
+        .modal-backdrop {
+            background-color: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(2px);
+        }
+
+        /* V4 Specific Styles for Profile */
+        select {
+            appearance: none;
+            background-image: none;
+            text-align-last: center;
+        }
+        /* Book Spine Effect */
+        .book-spine {
+            box-shadow: inset -1px 0 2px rgba(0,0,0,0.1);
+        }
+        /* Soft Shadow for spine */
+        .spine-shadow {
+             box-shadow: 1px 0 2px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Mock Data (V3 & V4 Combined) ---
+        const TOPICS = {
+            BUSINESS: "职场进阶",
+            LIFE: "日常交流",
+            ACADEMIC: "学术写作"
+        };
+
+        const MOCK_DB = {
+            [TOPICS.BUSINESS]: [
+                {
+                    id: 101,
+                    chinese: "虽然目前的预算很紧，但我们还是设法按时完成了项目。",
+                    ref_answer: "We managed to finish the project on time despite the tight budget.",
+                    // Data Structure for Learning Content
+                    studyPoints: {
+                        vocab: [
+                            { word: "manage", phonetic: "/ˈmænɪdʒ/", meaning: "v. 设法做成", usage: "manage to do sth" },
+                            { word: "despite", phonetic: "/dɪˈspaɪt/", meaning: "prep. 尽管", usage: "despite + noun/ving" }
+                        ],
+                        phrases: [
+                            { phrase: "tight budget", meaning: "预算紧张", collocations: "on a tight budget" },
+                            { phrase: "on time", meaning: "准时", collocations: "right on time" }
+                        ]
+                    },
+                    // Fallback for compatibility
+                    keywords: ["manage to (设法做成)", "tight budget (预算紧张)", "despite (尽管)"],
+                    feedback: {
+                        default: {
+                            details: "您使用了正确的句式结构，但可以考虑用 'manage to' 替代 'successfully' 来更自然地表达克服困难的含义。",
+                            userHighlights: ["successfully finished"],
+                            refHighlights: ["managed to finish"]
+                        }
+                    }
+                },
+                {
+                    id: 102,
+                    chinese: "鉴于目前的经济形势，我们需要重新评估Q3的营销策略。",
+                    ref_answer: "Given the current economic situation, we need to re-evaluate our marketing strategy for Q3.",
+                    studyPoints: {
+                        vocab: [
+                            { word: "re-evaluate", phonetic: "/ˌriːɪˈvæljueɪt/", meaning: "v. 重新评估", usage: "re-evaluate sth" },
+                            { word: "strategy", phonetic: "/ˈstrætədʒi/", meaning: "n. 策略", usage: "marketing strategy" }
+                        ],
+                        phrases: [
+                            { phrase: "Given that...", meaning: "鉴于/考虑到...", collocations: "Given the fact that..." },
+                            { phrase: "economic situation", meaning: "经济形势", collocations: "current situation" }
+                        ]
+                    },
+                    keywords: ["Given (鉴于/考虑到)", "re-evaluate (重新评估)", "strategy (策略)"],
+                    feedback: {
+                        default: {
+                            details: "使用 'Given' 开头是很专业的写法，比 'Because of' 更正式、更客观。",
+                            userHighlights: [],
+                            refHighlights: ["Given"]
+                        }
+                    }
+                }
+            ],
+            [TOPICS.LIFE]: [
+                {
+                    id: 201,
+                    chinese: "我不确定是否要提起这个话题，以免让他感到尴尬。",
+                    ref_answer: "I wasn't sure if I should bring up the topic, for fear of making him feel awkward.",
+                    studyPoints: {
+                         vocab: [
+                            { word: "awkward", phonetic: "/ˈɔːkwərd/", meaning: "adj. 尴尬的", usage: "feel awkward" }
+                        ],
+                        phrases: [
+                            { phrase: "bring up", meaning: "提起(话题)", collocations: "bring up a topic" },
+                            { phrase: "for fear of", meaning: "以免/唯恐", collocations: "for fear of doing" }
+                        ]
+                    },
+                    keywords: ["bring up (提起)", "for fear of (以免)", "awkward (尴尬的)"],
+                    feedback: {
+                        default: {
+                            details: "'Bring up' 是提起话题的地道表达。您用的 'mention' 也可以，但 'bring up' 更常用于引入敏感话题的语境。",
+                            userHighlights: ["mention"],
+                            refHighlights: ["bring up"]
+                        }
+                    }
+                }
+            ],
+            [TOPICS.ACADEMIC]: [
+                {
+                    id: 301,
+                    chinese: "这就引发了一个问题：人工智能最终是否会取代人类的创造力？",
+                    ref_answer: "This raises the question of whether AI will eventually supersede human creativity.",
+                    studyPoints: {
+                        vocab: [
+                            { word: "supersede", phonetic: "/ˌsuːpərˈsiːd/", meaning: "v. 取代/淘汰", usage: "supersede sth" },
+                            { word: "eventually", phonetic: "/ɪˈventʃuəli/", meaning: "adv. 最终", usage: "eventually do" }
+                        ],
+                        phrases: [
+                            { phrase: "raise the question", meaning: "引发问题", collocations: "raise the question of..." }
+                        ]
+                    },
+                    keywords: ["raise the question (引发问题)", "supersede (取代)", "eventually (最终)"],
+                    feedback: {
+                        default: {
+                            details: "'Supersede' 比 'replace' 更适合学术语境，它暗示新事物取代旧事物的渐进过程。",
+                            userHighlights: ["replace"],
+                            refHighlights: ["supersede"]
+                        }
+                    }
+                }
+            ]
+        };
+
+        // V4 Course Categories Data for Profile View
+        const COURSE_CATEGORIES = [
+            {
+                id: 'career',
+                title: '职场与考试',
+                courses: [
+                    { id: 'c1', title: '商务谈判实战', mapKey: TOPICS.BUSINESS, total: 300, learned: 135, color: '#8fa3a3' }, // Muted Teal
+                    { id: 'c2', title: '雅思口语高分', mapKey: 'IELTS', total: 500, learned: 24, color: '#9cadce' }, // Dust Blue
+                    { id: 'c3', title: '职场邮件写作', mapKey: 'EMAIL', total: 120, learned: 0, color: '#a5a58d' }, // Olive
+                    { id: 'c4', title: '托福听力精听', mapKey: 'TOEFL', total: 450, learned: 0, color: '#b0b8b2' }  // Ash Green
+                ]
+            },
+            {
+                id: 'life',
+                title: '日常与旅行',
+                courses: [
+                    { id: 'c5', title: '地道美语日常', mapKey: TOPICS.LIFE, total: 800, learned: 142, color: '#d4a373' }, // Tan
+                    { id: 'c6', title: '出国旅行指南', mapKey: 'TRAVEL', total: 200, learned: 0, color: '#e6ccb2' }, // Almond
+                    { id: 'c7', title: '社交俚语大全', mapKey: 'SLANG', total: 150, learned: 0, color: '#ccb7ae' }, // Taupe
+                    { id: 'c8', title: '欧美电影金句', mapKey: 'MOVIE', total: 300, learned: 0, color: '#d5bdaf' }  // Muted Pink
+                ]
+            },
+            {
+                id: 'academic',
+                title: '学术与专业',
+                courses: [
+                    { id: 'c9', title: '学术论文写作', mapKey: TOPICS.ACADEMIC, total: 400, learned: 20, color: '#6d6875' }, // Eggplant
+                    { id: 'c10', title: '科技新闻精读', mapKey: 'TECH', total: 600, learned: 0, color: '#5e6472' }, // Slate
+                    { id: 'c11', title: '法律英语基础', mapKey: 'LAW', total: 250, learned: 0, color: '#7e7f83' }, // Gray
+                    { id: 'c12', title: '医学词汇入门', mapKey: 'MED', total: 180, learned: 0, color: '#8d99ae' }  // Cool Gray
+                ]
+            }
+        ];
+
+        // --- Simulated Recent Courses Data ---
+        // Picking one from each category to simulate "Recently Learned"
+        const RECENT_COURSES = [
+            { id: 'c1', title: '商务谈判实战', mapKey: TOPICS.BUSINESS, color: '#8fa3a3' },
+            { id: 'c5', title: '地道美语日常', mapKey: TOPICS.LIFE, color: '#d4a373' },
+            { id: 'c9', title: '学术论文写作', mapKey: TOPICS.ACADEMIC, color: '#6d6875' }
+        ];
+
+        // --- Helper to find color by topic name ---
+        const getTopicColor = (topicName) => {
+            for (const category of COURSE_CATEGORIES) {
+                for (const course of category.courses) {
+                    if (course.mapKey === topicName) {
+                        return course.color;
+                    }
+                }
+            }
+            return '#94a3b8'; // Default grey
+        };
+
+        // --- Icons (Combined V3 & V4) ---
+        const Icons = {
+            ArrowRight: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+            RefreshCw: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+            RotateCcw: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
+            ThumbsUp: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>,
+            Star: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+            Archive: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>,
+            Lightbulb: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2.4 1.5-3.8 0-3.2-2.8-6-6-6S6 5.8 6 9c0 1.4.5 2.8 1.5 3.8.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+            CheckCircle: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+            AlertCircle: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+            Sparkles: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>,
+            User: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+            Flag: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>,
+            X: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            ChevronDown: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
+            ChevronUp: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>,
+            // V4 Additional Icons
+            ChevronLeft: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
+            ArrowLeftRight: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>,
+        };
+
+        // --- Feedback Modal ---
+        const FeedbackModal = ({ isOpen, onClose }) => {
+            const [text, setText] = useState('');
+            const [isSubmitting, setIsSubmitting] = useState(false);
+
+            if (!isOpen) return null;
+
+            const handleSubmit = () => {
+                if (!text.trim()) return;
+                setIsSubmitting(true);
+                // Mock API call
+                setTimeout(() => {
+                    setIsSubmitting(false);
+                    setText('');
+                    onClose();
+                    alert("反馈已提交，感谢您的建议！");
+                }, 1000);
+            };
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+                    <div className="absolute inset-0 modal-backdrop" onClick={onClose}></div>
+                    <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl p-6 animate-scale-in">
+                        <button onClick={onClose} className="absolute right-4 top-4 text-brand-textMuted hover:text-brand-text">
+                            <Icons.X size={20} />
+                        </button>
+                        
+                        <h3 className="text-lg font-bold text-brand-text mb-2">问题反馈</h3>
+                        <p className="text-sm text-brand-textSecondary mb-4">
+                            发现翻译错误或有功能建议？请告诉我们。
+                        </p>
+                        
+                        <textarea
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            placeholder="请描述您遇到的问题或建议..."
+                            className="w-full h-32 p-3 text-sm border border-brand-border rounded-lg focus:outline-none focus:border-brand-text resize-none mb-4"
+                            autoFocus
+                        />
+                        
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                onClick={onClose}
+                                className="px-4 py-2 text-sm text-brand-textSecondary hover:bg-brand-bgSecondary rounded-lg transition-colors"
+                            >
+                                取消
+                            </button>
+                            <button 
+                                onClick={handleSubmit}
+                                disabled={!text.trim() || isSubmitting}
+                                className="px-4 py-2 text-sm bg-brand-text text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Icons.RefreshCw size={14} className="animate-spin" />
+                                        <span>提交中...</span>
+                                    </>
+                                ) : (
+                                    <span>提交反馈</span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Profile View Component (From V4) ---
+        const ProfileView = ({ onBack, currentTopic, onChangeTopic }) => {
+            const [userSettings, setUserSettings] = useState({
+                nativeLang: "中文 (简体)",
+                targetLang: "English (US)",
+            });
+
+            const [stats, setStats] = useState({
+                totalTime: 12.5,
+                sentencesLearned: 301, 
+                daysStreak: 5
+            });
+
+            const handleCourseClick = (course) => {
+                if (!MOCK_DB[course.mapKey]) {
+                    alert(`"${course.title}" 课程正在制作中，敬请期待！`);
+                    return;
+                }
+                onChangeTopic(course.mapKey);
+                onBack();
+            };
+
+            return (
+                <div className="animate-fade-in pb-12 pt-4">
+                    {/* User Info Card */}
+                    <div className="bg-white rounded-xl border border-brand-border p-6 mb-8 flex flex-col items-center shadow-sm">
+                        <div className="w-16 h-16 bg-brand-bgSecondary rounded-full flex items-center justify-center text-brand-textSecondary mb-3">
+                            <Icons.User size={32} />
+                        </div>
+                        <h2 className="text-xl font-serif font-bold text-brand-text mb-1">User_8392</h2>
+                        <div className="flex items-center gap-2 mb-6">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                            <p className="text-xs text-brand-textSecondary tracking-wide uppercase">坚持学习 {stats.daysStreak} 天</p>
+                        </div>
+                        
+                        <div className="flex w-full divide-x divide-brand-borderLight">
+                            <div className="flex-1 text-center px-4">
+                                <div className="text-2xl font-serif font-bold text-brand-text">{stats.totalTime}h</div>
+                                <div className="text-[10px] text-brand-textMuted uppercase tracking-widest mt-1">累计时长</div>
+                            </div>
+                            <div className="flex-1 text-center px-4">
+                                <div className="text-2xl font-serif font-bold text-brand-text">{stats.sentencesLearned}</div>
+                                <div className="text-[10px] text-brand-textMuted uppercase tracking-widest mt-1">已学句子</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Language Settings */}
+                    <div className="mb-10">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-brand-textMuted mb-3 px-1">语言设置</h3>
+                        <div className="bg-white rounded-lg border border-brand-border h-14 flex items-center shadow-sm relative overflow-hidden px-4">
+                            {/* Native */}
+                            <div className="flex-1 flex flex-col justify-center border-r border-brand-borderLight pr-2 h-full">
+                                <span className="text-[10px] text-brand-textMuted uppercase mb-0.5">母语</span>
+                                <select 
+                                    value={userSettings.nativeLang}
+                                    onChange={(e) => setUserSettings({...userSettings, nativeLang: e.target.value})}
+                                    className="w-full text-sm font-medium text-brand-text bg-transparent border-none outline-none cursor-pointer hover:text-blue-600 transition-colors text-left"
+                                    style={{ textAlignLast: 'left' }}
+                                >
+                                    <option>中文 (简体)</option>
+                                    <option>中文 (繁體)</option>
+                                    <option>Japanese</option>
+                                </select>
+                            </div>
+
+                            {/* Divider Icon */}
+                            <div className="px-4 text-brand-textMuted/50">
+                                <Icons.ArrowLeftRight size={16} />
+                            </div>
+
+                            {/* Target */}
+                            <div className="flex-1 flex flex-col justify-center border-l border-brand-borderLight pl-4 h-full">
+                                <span className="text-[10px] text-brand-textMuted uppercase mb-0.5 text-right w-full block">学习语言</span>
+                                <select 
+                                    value={userSettings.targetLang}
+                                    onChange={(e) => setUserSettings({...userSettings, targetLang: e.target.value})}
+                                    className="w-full text-sm font-medium text-brand-text bg-transparent border-none outline-none cursor-pointer hover:text-blue-600 transition-colors text-right"
+                                    style={{ textAlignLast: 'right' }}
+                                >
+                                    <option>English (US)</option>
+                                    <option>English (UK)</option>
+                                    <option>French</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Course Selection Categories */}
+                    <div className="space-y-10">
+                        {COURSE_CATEGORIES.map((category) => (
+                            <div key={category.id}>
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-brand-textMuted mb-4 px-1 flex items-center gap-2">
+                                    {category.title}
+                                </h3>
+                                
+                                <div className="grid grid-cols-3 gap-2 md:grid-cols-4 md:gap-4">
+                                    {category.courses.map((course) => {
+                                        const isSelected = currentTopic === course.mapKey;
+                                        const progressPercent = Math.round((course.learned / course.total) * 100);
+                                        
+                                        return (
+                                            <div 
+                                                key={course.id}
+                                                onClick={() => handleCourseClick(course)}
+                                                className={`group relative flex flex-col bg-white rounded-lg cursor-pointer transition-all duration-300 border hover:border-brand-textMuted overflow-hidden ${
+                                                    isSelected ? 'border-brand-text ring-1 ring-brand-text' : 'border-brand-border'
+                                                }`}
+                                                style={{ 
+                                                    // Mobile: condensed height, PC: tall elegant height
+                                                }}
+                                            >
+                                                {/* Mobile height class: min-h-[110px], PC height class: md:min-h-[160px] */}
+                                                <div className="min-h-[110px] md:min-h-[160px] w-full flex flex-col">
+                                                    
+                                                    {/* Book Spine (Left Color Strip) */}
+                                                    <div 
+                                                        className="absolute left-0 top-0 bottom-0 w-2 md:w-3 book-spine z-10"
+                                                        style={{ backgroundColor: course.color }}
+                                                    ></div>
+
+                                                    <div className="pl-4 md:pl-6 p-2 md:p-4 h-full flex flex-col justify-between flex-1">
+                                                        <div>
+                                                            <h4 className="font-serif font-bold text-[10px] md:text-sm leading-tight text-brand-text group-hover:opacity-80 transition-opacity">
+                                                                {course.title}
+                                                            </h4>
+                                                            {isSelected && (
+                                                                <span className="inline-block text-[8px] md:text-[9px] font-bold text-brand-textMuted border border-brand-border px-1 py-0.5 rounded mt-1.5 md:mt-2">
+                                                                    正在学习
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="mt-2 md:mt-4">
+                                                            <div className="flex justify-between items-end mb-1">
+                                                                <span className="text-[10px] text-brand-textMuted hidden md:inline">进度</span>
+                                                                <span className="text-[9px] md:text-[10px] font-bold text-brand-textSecondary text-right w-full block">
+                                                                    {course.learned}/{course.total}
+                                                                </span>
+                                                            </div>
+                                                            <div className="w-full bg-brand-bgSecondary rounded-full h-0.5 md:h-1 overflow-hidden">
+                                                                <div 
+                                                                    className="h-full rounded-full transition-all duration-700"
+                                                                    style={{ width: `${progressPercent}%`, backgroundColor: course.color }}
+                                                                ></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App (Combined Logic) ---
+        const App = () => {
+            const [topic, setTopic] = useState(TOPICS.BUSINESS);
+            const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
+            const [input, setInput] = useState('');
+            const [status, setStatus] = useState('input'); // input, checking, feedback
+            
+            const [showStudy, setShowStudy] = useState(false);
+            const [isSaved, setIsSaved] = useState(false);
+            const [isLiked, setIsLiked] = useState(false);
+            const [isMastered, setIsMastered] = useState(false);
+            
+            const [showAIAnalysis, setShowAIAnalysis] = useState(false);
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+            
+            // New State for View Switching
+            const [currentView, setCurrentView] = useState('home'); // 'home' or 'profile'
+
+            // Safe check for mock data existence
+            const currentTopicData = MOCK_DB[topic] || MOCK_DB[TOPICS.BUSINESS];
+            const currentLesson = currentTopicData[currentLessonIdx % currentTopicData.length];
+            
+            // Get current topic color
+            const currentTopicColor = getTopicColor(topic);
+
+            const textareaRef = useRef(null);
+
+            useEffect(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto';
+                    textareaRef.current.style.height = Math.max(52, textareaRef.current.scrollHeight) + 'px';
+                }
+            }, [input]);
+
+            useEffect(() => {
+                setShowStudy(false);
+                setIsSaved(false);
+                setIsLiked(false);
+                setIsMastered(false);
+                setShowAIAnalysis(false);
+            }, [currentLesson]);
+
+            useEffect(() => {
+                if (status === 'input' && textareaRef.current && currentView === 'home') {
+                    textareaRef.current.focus();
+                }
+            }, [status, currentLesson, currentView]);
+
+            const handleSubmit = () => {
+                if (!input.trim()) return;
+                setShowStudy(false);
+                setStatus('checking');
+                setTimeout(() => setStatus('feedback'), 800);
+            };
+
+            const handleNext = () => {
+                setStatus('input');
+                setInput('');
+                setCurrentLessonIdx(prev => prev + 1);
+            };
+
+            const handleRetry = () => {
+                setStatus('input');
+                setInput('');
+            };
+
+            const handleTopicChange = (newTopic) => {
+                setTopic(newTopic);
+                setCurrentLessonIdx(0);
+                setStatus('input');
+                setInput('');
+                setCurrentView('home'); // Ensure we go back to home when topic changes
+            };
+
+            const handleInputFocus = () => {
+                if (showStudy) setShowStudy(false);
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (status === 'input' && input.trim()) handleSubmit();
+                }
+            };
+            
+            const handleLogin = () => {
+                setIsLoggedIn(true);
+            };
+
+            const handleProfileClick = () => {
+                if (isLoggedIn) {
+                    setCurrentView(currentView === 'home' ? 'profile' : 'home');
+                } else {
+                    handleLogin();
+                }
+            };
+
+            const feedback = currentLesson.feedback.default;
+
+            return (
+                <div className="min-h-screen flex flex-col font-sans bg-brand-bg text-brand-text">
+                    
+                    {/* Header (Adaptive) */}
+                    <header className="px-5 md:px-6 py-4 md:py-6 flex justify-between items-center max-w-3xl mx-auto w-full sticky top-0 bg-brand-bg/95 backdrop-blur-sm z-40">
+                        {currentView === 'home' ? (
+                            // V3 Style Header Content
+                            <div className="flex items-center gap-2.5 md:gap-3 select-none">
+                                <div className="bg-brand-text text-brand-bg px-2.5 py-1 md:px-3 md:py-1.5 flex items-center justify-center rounded font-serif text-base md:text-lg font-bold">
+                                    日課
+                                </div>
+                                <span className="font-serif font-bold text-base md:text-lg text-brand-text">
+                                    DailyRike
+                                </span>
+                            </div>
+                        ) : (
+                            // Profile View Header (With Back Button)
+                            <button 
+                                onClick={() => setCurrentView('home')}
+                                className="flex items-center gap-1 text-brand-textSecondary hover:text-brand-text transition-colors"
+                            >
+                                <Icons.ChevronLeft size={20} />
+                                <span className="font-medium text-sm">返回练习</span>
+                            </button>
+                        )}
+
+                        <div className="flex items-center gap-4">
+                            {/* Topic Selector - Updated Style with Spine */}
+                            {currentView === 'home' && (
+                                <div className="relative group">
+                                    {/* Updated Button Design */}
+                                    <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded bg-white border border-brand-border shadow-sm hover:shadow transition-all group-hover:border-brand-textMuted group-hover:bg-brand-bgSecondary overflow-hidden">
+                                        <div 
+                                            className="w-1.5 h-4 rounded-sm book-spine"
+                                            style={{ backgroundColor: currentTopicColor }}
+                                        ></div>
+                                        <div className="flex flex-col items-start leading-none gap-0.5">
+                                             <span className="text-[9px] text-brand-textMuted uppercase tracking-wider scale-90 origin-left hidden md:block">Topic</span>
+                                             <span className="text-sm font-medium text-brand-text">{topic}</span>
+                                        </div>
+                                        <Icons.ChevronDown size={14} className="text-brand-textMuted ml-1" />
+                                    </button>
+                                    
+                                    <div className="absolute right-0 top-full mt-2 w-48 bg-brand-card shadow-lg rounded-lg py-1.5 hidden group-hover:block animate-fade-in z-10 border border-brand-border">
+                                        {RECENT_COURSES.map((course) => (
+                                            <button 
+                                                key={course.id}
+                                                onClick={() => handleTopicChange(course.mapKey)}
+                                                className="flex items-center w-full text-left px-4 py-3 text-sm hover:bg-brand-bgSecondary transition-colors gap-3"
+                                            >
+                                                <div 
+                                                    className="w-1 h-3 rounded-full"
+                                                    style={{ backgroundColor: course.color }}
+                                                ></div>
+                                                <span className={`${topic === course.mapKey ? 'font-semibold text-brand-text' : 'text-brand-textSecondary'}`}>
+                                                    {course.title}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Login/Profile Toggle */}
+                            <div className={`${currentView === 'home' ? 'border-l border-brand-border pl-4' : ''}`}>
+                                {isLoggedIn ? (
+                                    <button 
+                                        onClick={handleProfileClick}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-full transition-all border ${
+                                            currentView === 'profile' 
+                                                ? 'bg-brand-text text-white border-brand-text' 
+                                                : 'bg-brand-bgSecondary text-brand-text border-transparent hover:border-brand-border hover:bg-brand-border'
+                                        }`}
+                                    >
+                                        <Icons.User size={18} />
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={handleLogin}
+                                        className="text-sm font-medium text-brand-text hover:text-brand-textSecondary transition-colors"
+                                    >
+                                        登录
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content Area */}
+                    <main className="flex-1 w-full max-w-3xl mx-auto px-5 md:px-6 flex flex-col justify-center pb-16 md:pb-20 pt-4 md:pt-8">
+                        
+                        {currentView === 'profile' ? (
+                            // Render V4 Profile View
+                            <ProfileView 
+                                onBack={() => setCurrentView('home')} 
+                                currentTopic={topic}
+                                onChangeTopic={handleTopicChange}
+                            />
+                        ) : (
+                            // Render V3 Main Functionality
+                            <>
+                                {/* Topic Indicator - Reverted to Original Style (No Spine) */}
+                                <div className="mb-5 md:mb-6 flex items-center gap-2.5 opacity-50">
+                                    <span className="text-xs font-mono font-bold">
+                                        {(currentLessonIdx + 1).toString().padStart(2, '0')}
+                                    </span>
+                                    <div className="h-px w-8 md:w-10 bg-brand-border"></div>
+                                    <span className="text-xs tracking-wider font-medium">{topic}</span>
+                                </div>
+
+                                {/* Question */}
+                                <div className="mb-5 md:mb-6 animate-fade-in" key={currentLesson.id}>
+                                    <h1 className="text-2xl md:text-3xl lg:text-4xl font-serif font-medium leading-snug tracking-tight text-brand-text">
+                                        {currentLesson.chinese}
+                                    </h1>
+                                </div>
+
+                                {/* Show Hint Button */}
+                                <div className={`mb-6 md:mb-8 transition-all duration-300 ${status !== 'input' ? 'hidden' : 'block'}`}>
+                                    <button 
+                                        onClick={() => setShowStudy(!showStudy)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 border ${
+                                            showStudy 
+                                                ? 'bg-brand-text text-brand-bg border-brand-text' 
+                                                : 'bg-brand-bg text-brand-textMuted border-brand-border hover:border-brand-textMuted'
+                                        }`}
+                                    >
+                                        <Icons.Lightbulb size={16} />
+                                        <span>{showStudy ? '收起提示' : '查看提示'}</span>
+                                    </button>
+                                </div>
+
+                                {/* Learning Content (Hint) - Enhanced Layout with Split View */}
+                                {showStudy && status === 'input' && (
+                                    <div className="mb-6 md:mb-8 p-5 md:p-6 rounded-xl bg-brand-card border border-brand-border shadow-sm animate-expand overflow-hidden">
+                                        <div className="space-y-6">
+                                            {/* Standard Answer */}
+                                            <div>
+                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-2.5 text-brand-textMuted">
+                                                    标准参考
+                                                </h3>
+                                                <p className="text-lg md:text-xl font-serif font-semibold leading-relaxed text-brand-text">
+                                                    {currentLesson.ref_answer}
+                                                </p>
+                                            </div>
+                                            
+                                            <div className="h-px w-full bg-brand-borderLight"></div>
+                                            
+                                            {/* Core Knowledge Points - Split View */}
+                                            {currentLesson.studyPoints ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                                                    {/* Left: Vocabulary */}
+                                                    <div>
+                                                        <h3 className="text-xs font-bold uppercase tracking-widest mb-3 text-brand-textMuted">
+                                                            核心词汇
+                                                        </h3>
+                                                        <ul className="space-y-3">
+                                                            {currentLesson.studyPoints.vocab.map((v, i) => (
+                                                                <li key={i} className="flex flex-col gap-0.5">
+                                                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                                                        <span className="font-bold text-brand-text text-sm">{v.word}</span>
+                                                                        <span className="text-xs font-mono text-brand-textMuted">{v.phonetic}</span>
+                                                                        <span className="text-xs text-brand-textSecondary">{v.meaning}</span>
+                                                                    </div>
+                                                                    {/* Usage row */}
+                                                                    <div className="text-xs text-brand-textMuted pl-2 border-l-2 border-brand-borderLight">
+                                                                        {v.usage}
+                                                                    </div>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+
+                                                    {/* Right: Phrases */}
+                                                    <div className="md:border-l md:border-brand-borderLight md:pl-8">
+                                                        <h3 className="text-xs font-bold uppercase tracking-widest mb-3 text-brand-textMuted">
+                                                            高频短语
+                                                        </h3>
+                                                        <ul className="space-y-3">
+                                                            {currentLesson.studyPoints.phrases.map((p, i) => (
+                                                                <li key={i} className="flex flex-col gap-0.5">
+                                                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                                                        <span className="font-bold text-brand-text text-sm">{p.phrase}</span>
+                                                                        <span className="text-xs text-brand-textSecondary">{p.meaning}</span>
+                                                                    </div>
+                                                                    {/* Collocation row */}
+                                                                    <div className="text-xs text-brand-textMuted pl-2 border-l-2 border-brand-borderLight">
+                                                                        {p.collocations}
+                                                                    </div>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                /* Fallback for old data structure */
+                                                <div>
+                                                    <h3 className="text-xs font-bold uppercase tracking-widest mb-2.5 text-brand-textMuted">
+                                                        核心知识点
+                                                    </h3>
+                                                    <ul className="space-y-1.5">
+                                                        {currentLesson.keywords.map((kw, i) => (
+                                                            <li key={i} className="text-sm flex items-start gap-2 text-brand-textSecondary">
+                                                                <span className="text-brand-textMuted">·</span>
+                                                                <span>{kw}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Input Area */}
+                                <div className="relative mb-8 md:mb-10">
+                                    <textarea
+                                        ref={textareaRef}
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onFocus={handleInputFocus}
+                                        onKeyDown={handleKeyDown}
+                                        disabled={status !== 'input'}
+                                        rows={1}
+                                        placeholder="请输入您的英文翻译..."
+                                        className={`w-full text-lg md:text-xl font-light bg-transparent resize-none input-clean min-h-[52px] leading-relaxed ${
+                                            status === 'feedback' ? 'text-brand-textMuted' : 'text-brand-text'
+                                        }`}
+                                    />
+                                    <div className={`h-0.5 w-full mt-1.5 transition-all duration-500 ${
+                                        status === 'input' ? 'bg-brand-text' : 'bg-brand-border'
+                                    }`}></div>
+                                    
+                                    {status === 'input' && (
+                                        <div className="absolute right-0 top-full mt-2 text-xs text-brand-textMuted font-medium">
+                                            <span className="hidden md:inline">按 Enter 提交 · Shift+Enter 换行</span>
+                                            <span className="md:hidden">Enter 提交</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Feedback Area (V3 Style) */}
+                                {status === 'feedback' && (
+                                    <div className="animate-slide-up">
+                                        <div className="rounded-xl p-5 md:p-7 bg-brand-card border border-brand-border shadow-sm">
+                                            
+                                            {/* Standard Reference + Top Actions */}
+                                            <div className="mb-2">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <h3 className="text-xs font-bold uppercase tracking-widest text-brand-textMuted">
+                                                        标准参考
+                                                    </h3>
+                                                    {/* Top Action Buttons (Replaced bottom ones) */}
+                                                    <div className="flex items-center gap-1 md:gap-2">
+                                                        <button 
+                                                            onClick={() => setIsLiked(!isLiked)}
+                                                            className={`p-1.5 rounded-full transition-all ${
+                                                                isLiked ? 'bg-red-50 text-red-500' : 'text-brand-textMuted hover:bg-brand-bgSecondary'
+                                                            }`}
+                                                            title="点赞"
+                                                        >
+                                                            <Icons.ThumbsUp size={16} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setIsSaved(!isSaved)}
+                                                            className={`p-1.5 rounded-full transition-all ${
+                                                                isSaved ? 'bg-yellow-50 text-yellow-600' : 'text-brand-textMuted hover:bg-brand-bgSecondary'
+                                                            }`}
+                                                            title="收藏"
+                                                        >
+                                                            <Icons.Star size={16} fill={isSaved ? "currentColor" : "none"} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setIsMastered(!isMastered)}
+                                                            className={`p-1.5 rounded-full transition-all ${
+                                                                isMastered ? 'bg-green-50 text-green-600' : 'text-brand-textMuted hover:bg-brand-bgSecondary'
+                                                            }`}
+                                                            title="归档"
+                                                        >
+                                                            <Icons.Archive size={16} />
+                                                        </button>
+                                                        
+                                                        <div className="w-px h-3 bg-brand-border mx-0.5"></div>
+                                                        <button 
+                                                            onClick={() => setIsFeedbackModalOpen(true)}
+                                                            className="p-1.5 rounded-full transition-all text-brand-textMuted hover:bg-brand-bgSecondary hover:text-brand-text"
+                                                            title="反馈"
+                                                        >
+                                                            <Icons.Flag size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <p className="text-xl md:text-2xl font-serif font-semibold leading-relaxed text-brand-text">
+                                                    {currentLesson.ref_answer}
+                                                </p>
+                                            </div>
+
+                                            {/* AI Analysis - Tighter Spacing */}
+                                            <div className="space-y-2 mt-4">
+                                                
+                                                {!showAIAnalysis ? (
+                                                    <div className="flex justify-end">
+                                                        <button 
+                                                            onClick={() => setShowAIAnalysis(true)}
+                                                            className="flex items-center gap-1.5 text-sm text-brand-textSecondary hover:text-brand-text transition-colors group"
+                                                        >
+                                                            <Icons.Sparkles size={16} className="text-brand-textMuted group-hover:text-brand-textSecondary transition-colors" />
+                                                            <span className="border-b border-dashed border-brand-textMuted group-hover:border-brand-textSecondary pb-0.5">需要 AI 助教点评？</span>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="animate-expand bg-brand-bgSecondary/50 rounded-lg p-5 border border-brand-borderLight">
+                                                        <div className="flex items-center justify-between mb-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <Icons.Sparkles size={16} className="text-brand-text" />
+                                                                <span className="text-xs font-bold text-brand-text uppercase tracking-wider">AI 助教点评</span>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => setShowAIAnalysis(false)}
+                                                                className="text-xs text-brand-textMuted hover:text-brand-text flex items-center gap-1"
+                                                            >
+                                                                <span>收起</span>
+                                                                <Icons.ChevronUp size={12} />
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="space-y-3">
+                                                            {/* User Feedback (Merged into same container) */}
+                                                            {feedback.userHighlights.length > 0 && (
+                                                                <div className="flex items-start gap-3">
+                                                                    <span className="text-brand-textMuted shrink-0 select-none">💡</span>
+                                                                    <div className="text-sm leading-relaxed text-brand-textSecondary">
+                                                                        <span>你写的 </span>
+                                                                        <span className="diff-missing font-medium text-brand-text">
+                                                                            "{feedback.userHighlights[0]}"
+                                                                        </span>
+                                                                        <span> 可以优化为 </span>
+                                                                        <span className="diff-highlight font-medium text-brand-text">
+                                                                            "{feedback.refHighlights[0]}"
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            <p className="text-sm md:text-base leading-relaxed text-brand-textSecondary">
+                                                                {feedback.details}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                            </div>
+                                        </div>
+
+                                        {/* Bottom Actions - Removed Like/Save etc, kept Next/Retry */}
+                                        <div className="mt-8 md:mt-10 flex justify-center items-center gap-3 md:gap-4">
+                                            <button 
+                                                onClick={handleRetry}
+                                                className="group flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full border border-brand-border text-brand-textSecondary hover:bg-brand-bgSecondary transition-all"
+                                            >
+                                                <Icons.RotateCcw size={16} className="group-hover:-rotate-45 transition-transform"/>
+                                                <span className="font-medium text-sm md:text-base">再来一次</span>
+                                            </button>
+                                            <button 
+                                                onClick={handleNext}
+                                                className="group flex items-center gap-2 md:gap-3 px-6 md:px-8 py-2.5 md:py-3 rounded-full bg-brand-text text-brand-bg hover:opacity-90 transition-all"
+                                            >
+                                                <span className="font-medium text-sm md:text-base">下一句</span>
+                                                <Icons.ArrowRight size={16} className="group-hover:translate-x-1 transition-transform"/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Submit Button */}
+                                {status === 'input' && (
+                                    <div className="flex justify-end">
+                                        <button 
+                                            onClick={handleSubmit}
+                                            disabled={!input.trim()}
+                                            className="p-3 md:p-4 rounded-full bg-brand-bgSecondary text-brand-textMuted hover:bg-brand-border hover:text-brand-text disabled:opacity-0 transition-all duration-300"
+                                        >
+                                            <Icons.ArrowRight size={20} className="md:w-6 md:h-6" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Loading State */}
+                                {status === 'checking' && (
+                                    <div className="mt-10 flex flex-col items-center justify-center gap-3 animate-pulse">
+                                        <Icons.RefreshCw className="animate-spin text-brand-textMuted" size={22} />
+                                        <span className="text-sm font-medium text-brand-textSecondary">
+                                            正在核对...
+                                        </span>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="py-4 md:py-6 text-center text-xs text-brand-textMuted safe-bottom">
+                        <p>© 2025 DailyRike 日課</p>
+                    </footer>
+
+                    {/* Feedback Modal */}
+                    <FeedbackModal 
+                        isOpen={isFeedbackModalOpen} 
+                        onClose={() => setIsFeedbackModalOpen(false)} 
+                    />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
